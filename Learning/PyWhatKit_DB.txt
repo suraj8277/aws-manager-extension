@@ -1,0 +1,20 @@
+Date: 13/11/2025
+Time: 9:2
+Phone Number: +918210237547
+Message: Hello! This is an automated message from Python 😎
+--------------------
+Date: 13/11/2025
+Time: 9:5
+Phone Number: +918210237547
+Message: Instant message
+--------------------
+Date: 13/11/2025
+Time: 9:10
+Phone Number: +918210237547
+Message: Instant message
+--------------------
+Date: 13/11/2025
+Time: 9:11
+Phone Number: +918210237547
+Message: hello suraj how are you
+--------------------

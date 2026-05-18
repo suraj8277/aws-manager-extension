@@ -1,0 +1,8 @@
+Subnet ID,Instance Name,Instance ID,Private IPv4,Instance State,Instance Type,Region,Availability Zone,VPC ID,Platform
+subnet-01bc88a53a72d2cd2,ue1pl-lh-mqext01,i-0365a7135132818de,10.195.54.xx,running,r6i.xlarge,us-east-1,us-east-1a,vpc-0b5ebf29136aef1ac,Red Hat Enterprise Linux
+subnet-02b48e06ef36f093d,test-sh-web1,i-0ff8d2543c3317613,10.188.134.xx,stopped,t2.xlarge,us-east-2,us-east-2a,vpc-081e2346a9009d3e2,Linux/UNIX
+subnet-03a5062c35aee4f9a,demo,i-0c2acc188afb59743,10.195.56.xx,running,t2.micro,us-east-1,us-east-1b,vpc-0b5ebf29136aef1ac,Red Hat BYOL Linux
+subnet-05a80989b2fbb8eb9,ue2p-sh-web6,i-01cc2b4c6643dfeb5,10.188.136.xx,stopped,c4.2xlarge,us-east-2,us-east-2b,vpc-081e2346a9009d3e2,Linux/UNIX
+subnet-071e2d7dfa6e9b2d9,trubleshooting_system_check_t2,i-0b34e5519738404fc,10.188.140.xx,stopped,c4.2xlarge,us-east-2,us-east-2b,vpc-081e2346a9009d3e2,Linux/UNIX
+subnet-0925517705999d10e,test-aman,i-0dd69acb82505d384,10.188.139.xx,stopped,t2.micro,us-east-2,us-east-2c,vpc-081e2346a9009d3e2,Linux/UNIX
+subnet-092e956a9faefc4d4,ue1pl-sh-proxy-asg,i-040e9c20bcdb0ba50,10.195.58.xx,running,c6i.2xlarge,us-east-1,us-east-1c,vpc-0b5ebf29136aef1ac,Linux/UNIX
