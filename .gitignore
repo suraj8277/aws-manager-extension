@@ -1,0 +1,7 @@
+# Ignore local inventory memory
+aws_inventory_memory.json
+*.csv
+__pycache__/
+.DS_Store
+.env
+.venv/
