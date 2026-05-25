@@ -41,10 +41,37 @@ class AWSUniversalEngine:
         return None
 
     # --- SSO Account Discovery (Dynamic) ---
+    def _get_active_sso_token(self):
+        """Attempts to find a valid SSO access token in the local cache."""
+        cache_dir = os.path.expanduser('~/.aws/sso/cache')
+        if not os.path.exists(cache_dir):
+            return None
+        
+        for filename in os.listdir(cache_dir):
+            if filename.endswith('.json'):
+                try:
+                    with open(os.path.join(cache_dir, filename), 'r') as f:
+                        data = json.load(f)
+                        # Check if it has an access token and hasn't expired
+                        if 'accessToken' in data and 'expiresAt' in data:
+                            expires_at = datetime.strptime(data['expiresAt'].replace('Z', ''), "%Y-%m-%dT%H:%M:%S")
+                            if expires_at > datetime.utcnow():
+                                return data['accessToken']
+                except Exception:
+                    continue
+        return None
+
     def discover_sso_accounts(self, profile=None):
         """Lists all accounts accessible via the given SSO profile or session."""
         try:
-            # If no profile is provided, try to find one that uses an sso-session
+            token = self._get_active_sso_token()
+            if token:
+                # Use raw token if available
+                cmd = ["aws", "sso", "list-accounts", "--access-token", token, "--region", "eu-west-2", "--output", "json"]
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                return json.loads(result.stdout).get('accountList', [])
+
+            # Fallback to profile-based
             if not profile:
                 for section in self.config.sections():
                     if section.startswith('profile ') and self.config.has_option(section, 'sso_session'):
@@ -63,11 +90,43 @@ class AWSUniversalEngine:
     def discover_sso_roles(self, profile, account_id):
         """Lists roles accessible for a specific account."""
         try:
+            token = self._get_active_sso_token()
+            if token:
+                cmd = ["aws", "sso", "list-account-roles", "--access-token", token, "--account-id", account_id, "--region", "eu-west-2", "--output", "json"]
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                return json.loads(result.stdout).get('roleList', [])
+
             cmd = ["aws", "sso", "list-account-roles", "--profile", profile, "--account-id", account_id, "--output", "json"]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return json.loads(result.stdout).get('roleList', [])
         except Exception as e:
             return {"error": str(e)}
+
+    def discover_all_sso_mappings(self, profile=None):
+        """Discovers all Account+Role combinations accessible in the current SSO session."""
+        accounts = self.discover_sso_accounts(profile)
+        if isinstance(accounts, dict) and "error" in accounts:
+            return accounts
+
+        mappings = []
+        
+        # Use threading to fetch roles for all accounts in parallel
+        def fetch_roles(account):
+            roles = self.discover_sso_roles(profile, account['accountId'])
+            if isinstance(roles, list):
+                return [{
+                    "account_id": account['accountId'],
+                    "account_name": account['accountName'],
+                    "role_name": role['roleName']
+                } for role in roles]
+            return []
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(fetch_roles, acc) for acc in accounts]
+            for f in as_completed(futures):
+                mappings.extend(f.result())
+        
+        return mappings
 
     # --- Profile Management (Static Code) ---
     def add_profile(self, name, start_url, sso_region, account_id, role_name, region):
@@ -94,6 +153,27 @@ class AWSUniversalEngine:
         with open(AWS_CONFIG_PATH, 'w') as f:
             self.config.write(f)
         return f"Success: Profile '{name}' configured."
+
+    def bulk_add_profiles(self, mappings_input, start_url, sso_region, region):
+        """Adds multiple profiles at once from a JSON list of mappings or a file path starting with '@'."""
+        if mappings_input.startswith('@'):
+            file_path = mappings_input[1:]
+            with open(file_path, 'r') as f:
+                mappings = json.load(f)
+        else:
+            mappings = json.loads(mappings_input)
+            
+        results = []
+        for m in mappings:
+            # Generate a clean name: account-name-role-name (lowercase, no spaces)
+            safe_acc = m['account_name'].lower().replace(' ', '-')
+            safe_role = m['role_name'].lower().replace(' ', '-')
+            profile_name = f"{safe_acc}-{safe_role}"
+            
+            res = self.add_profile(profile_name, start_url, sso_region, m['account_id'], m['role_name'], region)
+            results.append(res)
+        
+        return f"Bulk Add Complete: {len(results)} profiles processed."
 
     def delete_profile(self, name):
         """Safely removes a profile from ~/.aws/config."""
@@ -275,17 +355,18 @@ class AWSUniversalEngine:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["refresh", "list-profiles", "discover-accounts", "discover-roles", "add-profile", "delete-profile", "export-csv"])
+    parser.add_argument("command", choices=["refresh", "list-profiles", "discover-accounts", "discover-roles", "discover-all-mappings", "add-profile", "bulk-add", "delete-profile", "export-csv"])
     parser.add_argument("--profile", help="AWS Profile name")
     parser.add_argument("--account-id", help="AWS Account ID for role discovery")
     parser.add_argument("--category", choices=["overview", "network", "security", "tags"], help="Category for CSV export")
     parser.add_argument("--output", help="Output path for CSV file")
-    # Args for add-profile
+    # Args for add-profile and bulk-add
     parser.add_argument("--name")
     parser.add_argument("--url")
     parser.add_argument("--sso-region")
     parser.add_argument("--role")
     parser.add_argument("--region")
+    parser.add_argument("--mappings", help="JSON string of mappings for bulk-add")
 
     args = parser.parse_args()
     engine = AWSUniversalEngine()
@@ -299,8 +380,12 @@ if __name__ == "__main__":
         print(json.dumps(engine.discover_sso_accounts(args.profile), indent=2))
     elif args.command == "discover-roles":
         print(json.dumps(engine.discover_sso_roles(args.profile, args.account_id), indent=2))
+    elif args.command == "discover-all-mappings":
+        print(json.dumps(engine.discover_all_sso_mappings(args.profile), indent=2))
     elif args.command == "add-profile":
         print(engine.add_profile(args.name, args.url, args.sso_region, args.account_id, args.role, args.region))
+    elif args.command == "bulk-add":
+        print(engine.bulk_add_profiles(args.mappings, args.url, args.sso_region, args.region))
     elif args.command == "delete-profile":
         print(engine.delete_profile(args.name))
     elif args.command == "export-csv":

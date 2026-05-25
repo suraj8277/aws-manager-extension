@@ -42,9 +42,10 @@ Once you have data, you can explore it instantly:
 
 ### 4. Adding New Accounts (Setup Wizard)
 1. Select **"Add Profile (Wizard)"**.
-2. The tool discovers all AWS accounts accessible via your current SSO session.
-3. Select an account and role from the interactive menus.
-4. The tool automatically updates your `~/.aws/config`.
+2. **Choose Mode:**
+    - **Single Profile:** Traditional step-by-step selection of one account and one role.
+    - **Bulk Add:** Discover all available roles across all accounts and select multiple items to add in one batch.
+3. The tool automatically updates your `~/.aws/config` with clean, standardized profile names.
 
 ---
 
@@ -52,6 +53,11 @@ Once you have data, you can explore it instantly:
 1. After viewing a category, select **"Export this view to CSV"**.
 2. Provide a filename (e.g., `inventory_report.csv`).
 3. The CSV will be generated in the local directory.
+
+---
+
+## 🛠️ Bulk Add Feature
+The Bulk Add feature uses multi-threading to quickly scan your entire AWS organization. It generates profile names using the format `[account-name]-[role-name]`. This is ideal for users managing dozens of accounts who want to set up their entire environment in seconds.
 
 ---
 

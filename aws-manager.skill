@@ -13,6 +13,9 @@ When the user selects "Refresh Inventory":
     - **Option 1:** "All Profiles" (Runs a full multi-account scan).
     - **Individual Options:** Each local profile found (Runs a scan for only that profile).
 3. **Consent & Run:** Once selected, describe the targeted scan and ask for a `yesno` confirmation to proceed with the `refresh` command.
+4. **Post-Refresh Loop (Mandatory):** Ask: "Scan complete. What would you like to do?"
+    - **Browse Inventory** (Search Memory)
+    - **Return to Main Menu**
 
 ## 🏠 MAIN MENU (Guided Interaction)
 Whenever the user wants to "start" or "manage" AWS, you must first present the **Main Menu** using `ask_user`:
@@ -74,17 +77,41 @@ Instead of manual typing, use the discovery features:
 
 ## 🧙‍♂️ AWS Setup Wizard (One-Command Flow)
 When the user says "setup wizard" or "add profile":
-1. **Discover Accounts:** Automatically run `discover-accounts` using an existing profile.
-2. **Account Menu:** Present the found accounts as a `choice` menu using `ask_user`.
-3. **Discover Roles:** Once an account is selected, run `discover-roles`.
-4. **Role Menu:** Present the roles as a `choice` menu.
-5. **Final Step:** Prompt for a profile name (default to account name), then show the final config and ask for a `yesno` confirmation to `add-profile`.
+1. **Choose Mode:** Ask: "How would you like to add profiles?"
+    - **Single Profile:** The traditional step-by-step discovery.
+    - **Bulk Add (Multi-Select):** Discover and add multiple account/role pairs at once.
+
+2. **If Bulk Add selected:**
+    - **Discover Mappings:** Automatically run `discover-all-mappings`.
+    - **Handling Large Lists:** If more than 4 mappings are found:
+        - Ask: "Found [Count] mappings. How would you like to select?"
+            - **Select ALL:** Add every discovered mapping immediately.
+            - **Filter by Keyword:** Ask for a search term (e.g., "prod", "uat") to narrow the list.
+            - **Browse Page-by-Page:** Show 3 mappings at a time with a "Next Page" option.
+    - **Multi-Select Menu:** Present the filtered/paginated mappings as a `choice` menu with `multiSelect: true`.
+    - **Default Region:** Ask: "What should be the default AWS region for these profiles? (e.g., us-east-1)" using `ask_user`.
+    - **Final Step:** Show the list of chosen mappings and ask for a `yesno` confirmation to `bulk-add`.
+
+3. **If Single Profile selected:**
+    - **Discover Accounts:** Automatically run `discover-accounts` using an existing profile.
+    - **Account Menu:** Present the found accounts as a `choice` menu using `ask_user`.
+    - **Discover Roles:** Once an account is selected, run `discover-roles`.
+    - **Role Menu:** Present the roles as a `choice` menu.
+    - **Final Step:** Prompt for a profile name (default to account name), then show the final config and ask for a `yesno` confirmation to `add-profile`.
+
+4. **Post-Setup Loop (Mandatory):** After any profile addition, ask: "Profiles updated. What would you like to do?"
+    - **Refresh Inventory** (To scan new profiles)
+    - **Add More Profiles** (Back to Step 1)
+    - **Return to Main Menu**
 
 ## 🛠️ Command Reference
 - `refresh`: Updates the Universal Memory.
 - `list-profiles`: Shows currently configured local profiles.
 - `discover-accounts`: Lists all accounts accessible via an active SSO session.
-- `add-profile`: Programmatically updates `~/.aws/config`.
+- `discover-roles`: Lists roles for a specific account.
+- `discover-all-mappings`: Lists all Account+Role combinations in the session.
+- `add-profile`: Programmatically updates `~/.aws/config` for one profile.
+- `bulk-add`: Adds multiple profiles from a selection.
 - `export-csv`: Generates a CSV report from local memory.
 
 ## 📖 Interaction Patterns
