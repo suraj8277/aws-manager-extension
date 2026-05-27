@@ -14,13 +14,26 @@ A specialized Gemini CLI extension for secure, high-speed AWS infrastructure vis
 - `skills/aws-manager/scripts/aws_engine.py`: The Python backend for AWS API interaction.
 
 ## 📦 Installation
-1. Clone this repository.
+
+To install this extension directly into your Gemini CLI, use one of the following commands:
+
+**Recommended (SSH)**
+```bash
+gemini extensions install git@github.com:suraj8277/AWS_Assistant.git
+```
+
+**Alternative (HTTPS)**
+```bash
+gemini extensions install https://github.com/suraj8277/AWS_Assistant.git
+```
+
+### Manual Setup (Development)
+1. Clone this repository to your local machine.
 2. Ensure you have the AWS CLI configured.
 3. Install dependencies:
    ```bash
-   pip install boto3 pandas openpyxl
+   pip install boto3 pandas openpyxl rich
    ```
-4. Load into Gemini CLI.
 
 ## 🛡️ Security & Privacy
 - **Strictly Read-Only:** No commands can modify or delete AWS resources.
