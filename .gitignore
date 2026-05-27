@@ -1,7 +1,16 @@
-# Ignore local inventory memory
-aws_inventory_memory.json
+# Gemini Local Data
+*.json
 *.csv
+*.log
+
+# Python
 __pycache__/
-.DS_Store
+*.py[cod]
+*$py.class
+venv/
 .env
-.venv/
+
+# System/IDE
+.DS_Store
+.vscode/
+.idea/

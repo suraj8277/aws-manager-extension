@@ -1,70 +1,31 @@
-# AWS Manager (Standalone) 🛡️
+# Gemini AWS Assistant Extension
 
-Universal AWS Assistant for secure, read-only infrastructure visibility and interactive profile discovery.
+A specialized Gemini CLI extension for secure, high-speed AWS infrastructure visibility. 
 
-## 🚀 Installation
+## 🚀 Features
+- **Cache-First Architecture:** Instant search and browse using local inventory memory.
+- **Multi-Account/Region Scanning:** Parallel scanning across dozens of profiles.
+- **SSO Integration:** Native handling of AWS SSO login sessions.
+- **Human-Readable Output:** Detailed "Notepad" views and structured Unicode tables.
+- **Proactive Navigation:** Guided flows for discovery and troubleshooting.
 
-To use this as a standalone tool, ensure you have Python 3.x installed and the required dependencies:
+## 🛠️ Structure
+- `skills/aws-manager/SKILL.md`: The logic defining Gemini's behavior and UI.
+- `skills/aws-manager/scripts/aws_engine.py`: The Python backend for AWS API interaction.
 
-```bash
-pip install boto3 pandas
-```
+## 📦 Installation
+1. Clone this repository.
+2. Ensure you have the AWS CLI configured.
+3. Install dependencies:
+   ```bash
+   pip install boto3 pandas openpyxl
+   ```
+4. Load into Gemini CLI.
 
-To integrate with Gemini CLI as a skill, add the path to `aws-manager.skill` in your Gemini configuration.
-
-## 📖 User Guide: How to Use
-
-### 1. The Main Menu
-To get started, simply type **"aws"** or **"show me the aws menu"**. Gemini will present you with primary options:
-- **Search Memory**: Quick lookups from your last scan.
-- **Refresh Inventory**: Update your local cache with the latest AWS data.
-- **Add Profile (Wizard)**: A step-by-step guide to adding new AWS accounts.
-- **List/Delete Profiles**: Manage your local `~/.aws/config`.
-
----
-
-### 2. Updating Your Inventory (Refresh)
-Before searching, you need data!
-1. Select **"Refresh Inventory"** from the main menu.
-2. Choose **"All Profiles"** for a full scan or select a **specific profile**.
-3. The engine will scan all regions in those accounts and save the data to `aws_inventory_memory.json`.
-4. *Note:* If your SSO token is expired, you will be prompted to run `aws sso login`.
+## 🛡️ Security & Privacy
+- **Strictly Read-Only:** No commands can modify or delete AWS resources.
+- **Local Cache:** Inventory data is stored only on your local machine (`aws_inventory_memory.json`).
+- **Confirmation Required:** Every AWS command and file access requires explicit user consent.
 
 ---
-
-### 3. Searching and Navigating (Search Memory)
-Once you have data, you can explore it instantly:
-1. Select **"Search Memory"**.
-2. **IP Lookup:** You can ask specifically: *"Find the server with IP 10.50.1.20"* or *"Which VPC is 172.16.5.4 in?"*
-3. **Drill Down:** Explore by Account, Region, and Category (Network, Security, Tags, etc.).
-
----
-
-### 4. Adding New Accounts (Setup Wizard)
-1. Select **"Add Profile (Wizard)"**.
-2. **Choose Mode:**
-    - **Single Profile:** Traditional step-by-step selection of one account and one role.
-    - **Bulk Add:** Discover all available roles across all accounts and select multiple items to add in one batch.
-3. The tool automatically updates your `~/.aws/config` with clean, standardized profile names.
-
----
-
-### 5. Exporting Data
-1. After viewing a category, select **"Export this view to CSV"**.
-2. Provide a filename (e.g., `inventory_report.csv`).
-3. The CSV will be generated in the local directory.
-
----
-
-## 🛠️ Bulk Add Feature
-The Bulk Add feature uses multi-threading to quickly scan your entire AWS organization. It generates profile names using the format `[account-name]-[role-name]`. This is ideal for users managing dozens of accounts who want to set up their entire environment in seconds.
-
----
-
-## 🛡️ Security & Safety
-
-- **Read-Only:** This tool uses only `Describe` and `List` APIs. It cannot modify AWS resources.
-- **Local Privacy:** Your AWS data is stored locally in `aws_inventory_memory.json` and is never sent to external servers.
-
----
-Developed for Gemini CLI.
+Developed by Suraj Kumar

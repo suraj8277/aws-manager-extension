@@ -232,6 +232,310 @@ class AWSUniversalEngine:
         except Exception:
             return []
 
+    def _print_box_table(self, rows, title=None):
+        """Prints a list of dictionaries as a Unicode box-drawing table."""
+        if not rows: return
+        
+        headers = list(rows[0].keys())
+        # Calculate max width for each column
+        widths = {h: len(h) for h in headers}
+        for r in rows:
+            for h in headers:
+                val = str(r.get(h, ''))
+                widths[h] = max(widths[h], len(val))
+
+        # Helper to draw a line
+        def draw_line(left, middle, right, cross):
+            line = left
+            for i, h in enumerate(headers):
+                line += middle * (widths[h] + 2)
+                if i < len(headers) - 1: line += cross
+            line += right
+            print(line)
+
+        if title:
+            print(f"\n--- {title} ---")
+
+        # Top border
+        draw_line('┌', '─', '┐', '┬')
+        
+        # Headers
+        header_row = "│"
+        for h in headers:
+            header_row += f" {h:<{widths[h]}} │"
+        print(header_row)
+        
+        # Header separator
+        draw_line('├', '─', '┤', '┼')
+        
+        # Data rows
+        for r in rows:
+            row_str = "│"
+            for h in headers:
+                val = str(r.get(h, ''))
+                row_str += f" {val:<{widths[h]}} │"
+            print(row_str)
+            
+        # Bottom border
+        draw_line('└', '─', '┘', '┴')
+
+    def get_inventory_summary(self, format='table'):
+        """Prints a summary of instances per profile from local memory."""
+        if not os.path.exists(CACHE_FILE):
+            return "Error: Local memory not found. Please run 'refresh' first."
+
+        with open(CACHE_FILE, 'r') as f:
+            memory = json.load(f)
+
+        raw_data = memory.get('raw_data', [])
+        summary = {}
+        for i in raw_data:
+            p = i.get('__Assistant_Profile', 'Unknown')
+            summary[p] = summary.get(p, 0) + 1
+
+        if not summary:
+            return "No data found in memory."
+
+        if format == 'rich' or format == 'pro':
+            print("\n" + "═"*60)
+            print(f"  AWS INVENTORY SUMMARY ({len(raw_data)} Instances)")
+            print("═"*60)
+            for k, v in sorted(summary.items(), key=lambda x: x[1], reverse=True):
+                print(f" ║ {k:<45} ║ {v:>4} ║")
+            print("═"*60)
+            return ""
+
+        sorted_summary = [{"Count": str(v), "Profile": k} for k, v in sorted(summary.items(), key=lambda x: x[1], reverse=True)]
+        
+        self._print_box_table(sorted_summary)
+        return f"\nTotal Instances: {len(raw_data)}"
+
+    def sso_login(self, profile):
+        """Triggers the interactive AWS SSO login flow."""
+        try:
+            print(f"Opening browser for SSO login (Profile: {profile})...")
+            # Using subprocess.run without capture_output to allow it to be interactive if needed
+            subprocess.run(["aws", "sso", "login", "--profile", profile], check=True)
+            return f"Success: Logged in to profile '{profile}'."
+        except Exception as e:
+            return f"Error during login: {e}"
+
+    def search_memory(self, query, profile=None):
+        """Searches local memory for an IP, Name, or Instance ID."""
+        if not os.path.exists(CACHE_FILE):
+            return {"error": "Local memory not found. Please run 'refresh' first."}
+
+        with open(CACHE_FILE, 'r') as f:
+            memory = json.load(f)
+
+        query = query.lower()
+        matches = []
+        for inst in memory.get('raw_data', []):
+            if profile and inst.get('__Assistant_Profile') != profile:
+                continue
+                
+            tags = {t['Key'].lower(): t['Value'] for t in inst.get('Tags', [])}
+            name = tags.get('name', '').lower()
+            private_ip = str(inst.get('PrivateIpAddress', '')).lower()
+            instance_id = inst.get('InstanceId', '').lower()
+
+            # Match if query is in Name, matches IP exactly, or matches ID exactly
+            if query in name or query == private_ip or query == instance_id:
+                matches.append(inst)
+
+        if not matches:
+            print(f"No matches found for '{query}'.")
+            return ""
+
+        # SINGLE MATCH: Show detailed "Notepad" style output
+        if len(matches) == 1:
+            inst = matches[0]
+            tags = {t['Key']: t['Value'] for t in inst.get('Tags', [])}
+            print("\n" + "═"*60)
+            print(f"  DETAILED INSTANCE VIEW: {tags.get('Name', 'N/A')}")
+            print("═"*60)
+            print(f"  Instance ID    : {inst.get('InstanceId')}")
+            print(f"  Private IP     : {inst.get('PrivateIpAddress', 'N/A')}")
+            print(f"  Public IP      : {inst.get('PublicIpAddress', 'N/A')}")
+            print(f"  Instance Type  : {inst.get('InstanceType')}")
+            print(f"  State          : {inst.get('State', {}).get('Name')}")
+            print(f"  VPC ID         : {inst.get('VpcId')}")
+            print(f"  Subnet ID      : {inst.get('SubnetId')}")
+            print(f"  Launch Time    : {inst.get('LaunchTime')}")
+            print(f"  Platform       : {inst.get('PlatformDetails')}")
+            print(f"  IAM Role       : {inst.get('IamInstanceProfile', {}).get('Arn', 'N/A').split('/')[-1]}")
+            print(f"  Profile (AWS)  : {inst.get('__Assistant_Profile')}")
+            print(f"  Region         : {inst.get('__Assistant_Region')}")
+            print(f"  SSM Status     : {inst.get('__Assistant_SSM_PingStatus', 'N/A')}")
+            print("-" * 60)
+            print("  TAGS:")
+            for k, v in tags.items():
+                print(f"    {k:<15}: {v}")
+            print("═"*60 + "\n")
+            return ""
+
+        # MULTIPLE MATCHES: Show table
+        print(f"\nFound {len(matches)} matches (Showing top 20):")
+        
+        rows = []
+        for m in matches[:20]:
+            name = next((t['Value'] for t in m.get('Tags', []) if t['Key'] == 'Name'), 'N/A')[:25]
+            rows.append({
+                "Name": name,
+                "InstanceId": m.get('InstanceId'),
+                "PrivateIP": m.get('PrivateIpAddress', 'N/A'),
+                "Profile": m.get('__Assistant_Profile')
+            })
+        
+        self._print_box_table(rows)
+        return ""
+
+    def query_inventory(self, profile, category, region=None, format='table'):
+        """Prints formatted details of inventory details to the terminal."""
+        if not os.path.exists(CACHE_FILE):
+            return "Error: Local memory not found. Please run 'refresh' first."
+
+        with open(CACHE_FILE, 'r') as f:
+            memory = json.load(f)
+
+        instances = [i for i in memory.get('raw_data', []) if i.get('__Assistant_Profile') == profile]
+        if region:
+            instances = [i for i in instances if i.get('__Assistant_Region') == region]
+
+        if not instances:
+            return f"No instances found for profile '{profile}'" + (f" in region '{region}'" if region else "") + "."
+
+        if format == 'list':
+            # ... vertical display ...
+            print(f"\nACCOUNT: {profile} | REGION: {region if region else 'All'}")
+            print("═"*60)
+            for idx, inst in enumerate(instances[:50], 1):
+                tags = {t['Key']: t['Value'] for t in inst.get('Tags', [])}
+                name = tags.get('Name', 'N/A')
+                print(f"[{idx:02}] NAME: {name}")
+                print(f"     ID: {inst.get('InstanceId')} | IP: {inst.get('PrivateIpAddress', 'N/A')} | TYPE: {inst.get('InstanceType')}")
+                print(f"     STATE: {inst.get('State', {}).get('Name')} | SSM: {inst.get('__Assistant_SSM_PingStatus', 'N/A')} | REGION: {inst.get('__Assistant_Region')}")
+                print("-" * 60)
+            if len(instances) > 50:
+                print(f" * Showing 50 of {len(instances)} instances. Use Export for full details.")
+            return ""
+
+        if format == 'pro':
+            # DEFINITION OF COLUMNS PER CATEGORY
+            col_defs = {
+                'overview': [('NAME', 30), ('INSTANCE ID', 20), ('PRIVATE IP', 15), ('TYPE', 12), ('STATE', 10), ('SSM STATUS', 12)],
+                'network':  [('NAME', 25), ('VPC ID', 20), ('SUBNET ID', 20), ('SECURITY GROUPS', 35)],
+                'security': [('NAME', 25), ('INSTANCE ID', 20), ('IAM ROLE', 30), ('PLATFORM', 20)],
+                'tags':     [('NAME', 25), ('PROJECT', 20), ('OWNER', 20), ('ENVIRONMENT', 15)]
+            }
+            
+            active_cols = col_defs.get(category, col_defs['overview'])
+            
+            # Helper to build border lines
+            def get_line(left, mid, right, cross):
+                line = left
+                for i, (_, width) in enumerate(active_cols):
+                    line += '═' * (width + 2)
+                    if i < len(active_cols) - 1: line += cross
+                return line + right
+
+            top    = get_line('╔', '═', '╗', '╦')
+            sep    = get_line('╠', '═', '╣', '╬')
+            bottom = get_line('╚', '═', '╝', '╩')
+
+            header = "║"
+            for label, width in active_cols:
+                header += f" {label:<{width}} ║"
+
+            print(f"\nACCOUNT: {profile} | REGION: {region if region else 'All'}")
+            print(top)
+            print(header)
+            print(sep)
+
+            for inst in instances[:20]:
+                tags = {t['Key']: t['Value'] for t in inst.get('Tags', [])}
+                name = tags.get('Name', 'N/A')
+                
+                row = "║"
+                for label, width in active_cols:
+                    val = "N/A"
+                    if label == 'NAME': val = name
+                    elif label == 'INSTANCE ID': val = inst.get('InstanceId')
+                    elif label == 'PRIVATE IP': val = inst.get('PrivateIpAddress')
+                    elif label == 'TYPE': val = inst.get('InstanceType')
+                    elif label == 'STATE': val = inst.get('State', {}).get('Name')
+                    elif label == 'SSM STATUS': val = inst.get('__Assistant_SSM_PingStatus', 'N/A')
+                    elif label == 'VPC ID': val = inst.get('VpcId')
+                    elif label == 'SUBNET ID': val = inst.get('SubnetId')
+                    elif label == 'SECURITY GROUPS': val = ", ".join([sg.get('GroupName') for sg in inst.get('SecurityGroups', [])])
+                    elif label == 'IAM ROLE': val = inst.get('IamInstanceProfile', {}).get('Arn', 'N/A').split('/')[-1]
+                    elif label == 'PLATFORM': val = inst.get('PlatformDetails')
+                    elif label == 'PROJECT': val = tags.get('Project', tags.get('project', 'N/A'))
+                    elif label == 'OWNER': val = tags.get('Owner', tags.get('owner', 'N/A'))
+                    elif label == 'ENVIRONMENT': val = tags.get('Environment', tags.get('environment', 'N/A'))
+                    
+                    val = str(val)[:width] # TRUNCATE
+                    row += f" {val:<{width}} ║"
+                print(row)
+            
+            print(bottom)
+            if len(instances) > 20:
+                print(f" * Showing 20 of {len(instances)} instances. Use Export for full details.")
+            return ""
+
+        # PREPARE ROWS FOR TABLE/BOX FORMAT
+        rows = []
+        for inst in instances:
+            tags = {t['Key']: t['Value'] for t in inst.get('Tags', [])}
+            name = tags.get('Name', 'N/A')
+            
+            if category == 'overview':
+                rows.append({
+                    "Name": name[:35],
+                    "InstanceId": inst.get('InstanceId'),
+                    "State": inst.get('State', {}).get('Name'),
+                    "PrivateIP": inst.get('PrivateIpAddress', 'N/A'),
+                    "Type": inst.get('InstanceType'),
+                    "SSM": inst.get('__Assistant_SSM_PingStatus', 'N/A')
+                })
+            elif category == 'network':
+                sgs = ", ".join([sg.get('GroupName') for sg in inst.get('SecurityGroups', [])])[:40]
+                rows.append({
+                    "Name": name[:25],
+                    "VpcId": inst.get('VpcId'),
+                    "SubnetId": inst.get('SubnetId'),
+                    "SGs": sgs
+                })
+            elif category == 'security':
+                iam = inst.get('IamInstanceProfile', {}).get('Arn', 'N/A').split('/')[-1]
+                rows.append({
+                    "Name": name[:30],
+                    "InstanceId": inst.get('InstanceId'),
+                    "IAMRole": iam[:25],
+                    "Platform": inst.get('PlatformDetails')[:20]
+                })
+            elif category == 'tags':
+                proj = tags.get('Project', tags.get('project', 'N/A'))
+                owner = tags.get('Owner', tags.get('owner', 'N/A'))
+                env = tags.get('Environment', tags.get('environment', 'N/A'))
+                rows.append({
+                    "Name": name[:30],
+                    "Project": proj[:20],
+                    "Owner": owner[:20],
+                    "Env": env[:15]
+                })
+
+        if not rows:
+            return f"No data to display for category '{category}'."
+
+        limit = 30 if format == 'box' else 10
+        print(f"\nACCOUNT: {profile} | REGION: {region if region else 'All'}")
+        self._print_box_table(rows[:limit])
+        
+        if len(rows) > limit:
+            print(f"\n* Showing top {limit} of {len(rows)}. Use Export to see full list.*")
+        return ""
+
     def export_csv(self, profile, category, output_path):
         """Exports specific categories of data for a profile to a CSV file."""
         if not os.path.exists(CACHE_FILE):
@@ -355,11 +659,12 @@ class AWSUniversalEngine:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["refresh", "list-profiles", "discover-accounts", "discover-roles", "discover-all-mappings", "add-profile", "bulk-add", "delete-profile", "export-csv"])
+    parser.add_argument("command", choices=["refresh", "list-profiles", "discover-accounts", "discover-roles", "discover-all-mappings", "add-profile", "bulk-add", "delete-profile", "export-csv", "summary", "query", "login", "search"])
     parser.add_argument("--profile", help="AWS Profile name")
     parser.add_argument("--account-id", help="AWS Account ID for role discovery")
-    parser.add_argument("--category", choices=["overview", "network", "security", "tags"], help="Category for CSV export")
+    parser.add_argument("--category", choices=["overview", "network", "security", "tags"], help="Category for CSV export or Query")
     parser.add_argument("--output", help="Output path for CSV file")
+    parser.add_argument("--query-term", dest="query_term", help="Search query (IP, Name, or ID)")
     # Args for add-profile and bulk-add
     parser.add_argument("--name")
     parser.add_argument("--url")
@@ -367,6 +672,7 @@ if __name__ == "__main__":
     parser.add_argument("--role")
     parser.add_argument("--region")
     parser.add_argument("--mappings", help="JSON string of mappings for bulk-add")
+    parser.add_argument("--format", choices=["table", "rich", "pro", "list", "box"], default="table", help="Output format")
 
     args = parser.parse_args()
     engine = AWSUniversalEngine()
@@ -390,3 +696,11 @@ if __name__ == "__main__":
         print(engine.delete_profile(args.name))
     elif args.command == "export-csv":
         print(engine.export_csv(args.profile, args.category, args.output))
+    elif args.command == "summary":
+        print(engine.get_inventory_summary(format=args.format))
+    elif args.command == "query":
+        print(engine.query_inventory(args.profile, args.category, args.region, format=args.format))
+    elif args.command == "login":
+        print(engine.sso_login(args.profile))
+    elif args.command == "search":
+        print(engine.search_memory(args.query_term, profile=args.profile))
