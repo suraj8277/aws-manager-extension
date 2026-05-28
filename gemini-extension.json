@@ -1,0 +1,13 @@
+{
+  "name": "gemini-aws-assistant",
+  "version": "1.0.0",
+  "description": "Secure, cache-first AWS infrastructure visibility and multi-account scanning for Gemini CLI.",
+  "contextFileName": "skills/aws-manager/SKILL.md",
+  "mcpServers": {
+    "aws-manager-server": {
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "${extensionPath}"
+    }
+  }
+}
