@@ -19,13 +19,42 @@ To install this extension directly into your Gemini CLI, use one of the followin
 
 **Recommended (SSH)**
 ```bash
-gemini extensions install git@github.com:suraj8277/AWS_Assistant.git
+gemini extensions install git@github.com:suraj8277/aws-manager-extension.git
 ```
 
 **Alternative (HTTPS)**
 ```bash
-gemini extensions install https://github.com/suraj8277/AWS_Assistant.git
+gemini extensions install https://github.com/suraj8277/aws-manager-extension.git
 ```
+
+## 📦 Team Setup & Automated Onboarding
+
+Sharing this extension with your team is extremely simple:
+
+1. **Install the Extension:**
+   Your teammate installs the extension into their Gemini CLI:
+   ```bash
+   gemini extensions install https://github.com/suraj8277/aws-manager-extension.git
+   ```
+
+2. **Install Dependencies:**
+   Ensure Python and the required AWS SDK dependencies are installed:
+   ```bash
+   pip install boto3 pandas openpyxl rich
+   ```
+
+3. **Run the Interactive Wizard:**
+   Launch the extension inside Gemini CLI and open the **AWS Control Center**:
+   - Select **`🪄 Connect New Account`**.
+   - Input your **AWS SSO Start URL** (e.g., `https://d-xxxxxx.awsapps.com/start`), **SSO Region**, and **Default Resource Region**.
+   - Gemini will automatically:
+     - Initialize a secure login session.
+     - Open your browser to log in safely.
+     - Auto-discover all AWS Accounts and Roles you have access to.
+     - Bulk-configure local profiles in `~/.aws/config` dynamically.
+     - Prompt you to sync universal memory to download your local inventory cache.
+
+No manual file editing, copy-pasting of account IDs, or tedious setup is required!
 
 ### Manual Setup (Development)
 1. Clone this repository to your local machine.
